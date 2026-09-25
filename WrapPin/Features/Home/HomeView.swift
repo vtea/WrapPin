@@ -690,7 +690,6 @@ struct HomeView: View {
         recoveredWalkError = nil
 
         guard recovery.isRoute, let destination = recovery.destination else {
-            appModel.dismissInterruptedSessionRecovery()
             mapModel.show(recovery.lastReportedLocation)
             let mode = recovery.fixedCoordinateMode
                 ?? FixedCoordinateMode.recommended(for: recovery.lastReportedLocation)
@@ -718,7 +717,6 @@ struct HomeView: View {
                 return
             }
 
-            appModel.dismissInterruptedSessionRecovery()
             walkingSimulation.prepare(route: route, destination: destination, mode: recovery.routeMode)
             if let savedSpeed = recovery.savedRouteSpeed, savedSpeed.isFinite {
                 if recovery.routeMode == .walking {
@@ -736,8 +734,8 @@ struct HomeView: View {
             }
             mapModel.show(route)
             followsSimulatedLocation = recovery.routeMode == .driving
-            isPreparingRecoveredWalk = false
             await walkingSimulation.start(using: appModel)
+            isPreparingRecoveredWalk = false
         }
     }
 

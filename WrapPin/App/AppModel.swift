@@ -398,7 +398,7 @@ final class AppModel {
         }
 
         self.selectedTarget = selectedTarget
-        dismissInterruptedSessionRecovery()
+        concealInterruptedSessionPrompt()
         activeSessionRecovery = recovery
         lastRecoverySaveDate = nil
         addToHistory(historyTarget)
@@ -427,8 +427,8 @@ final class AppModel {
 
         do {
             guard let pairingRecord = try await pairingService.pairingRecordData() else {
-                activeSessionRecovery = nil
                 pendingSessionAnalyticsEvent = nil
+                restoreUnpersistedInterruptedSession()
                 pairingStatus = .notPaired
                 connectionState = .notConfigured
                 usageAnalytics.recordFailure(.locationPreparation, context: .location, enabled: sharesAnonymousUsageStatistics)
@@ -449,8 +449,8 @@ final class AppModel {
                 simulationCoordinates: simulationCoordinates
             )
         } catch {
-            activeSessionRecovery = nil
             pendingSessionAnalyticsEvent = nil
+            restoreUnpersistedInterruptedSession()
             connectionState = .failed(message: error.localizedDescription)
             usageAnalytics.recordFailure(.locationPreparation, context: .location, enabled: sharesAnonymousUsageStatistics)
             usageAnalytics.record(
@@ -517,6 +517,25 @@ final class AppModel {
         preferences.removeObject(forKey: Self.activeSessionRecoveryKey)
     }
 
+    private func concealInterruptedSessionPrompt() {
+        interruptedSession = nil
+        interruptedSessionError = nil
+    }
+
+    private func restoreUnpersistedInterruptedSession() {
+        activeSessionRecovery = nil
+        lastRecoverySaveDate = nil
+        interruptedSession = Self.recoveryRecord(in: preferences)
+    }
+
+    private func endUnconfirmedSessionAttempt() {
+        if lastRecoverySaveDate == nil, Self.recoveryRecord(in: preferences) != nil {
+            restoreUnpersistedInterruptedSession()
+        } else {
+            clearActiveSessionRecovery()
+        }
+    }
+
     func stopLocationSession() {
         isStoppingLocationSessionForRestoration = true
         deviceSession.stop()
@@ -577,7 +596,7 @@ final class AppModel {
                     dismissInterruptedSessionRecovery()
                 }
             }
-            clearActiveSessionRecovery()
+            endUnconfirmedSessionAttempt()
             if case .paired = pairingStatus {
                 connectionState = .ready
             } else {
@@ -629,7 +648,7 @@ final class AppModel {
                     enabled: sharesAnonymousUsageStatistics
                 )
                 if deviceSession.lastFailureStage != .locationRestore {
-                    clearActiveSessionRecovery()
+                    endUnconfirmedSessionAttempt()
                 }
             }
         }
